@@ -74,6 +74,12 @@ def fetch_trending(api_key: str, region_code: str = "KR", max_results: int = 30)
 
 def main() -> None:
     st.set_page_config(page_title="YouTube Trending (KR)", layout="wide")
+
+    # Require login first (hide UI until authenticated)
+    if not require_login():
+        return
+
+    # Show UI only after successful login
     st.title("유튜브 인기 동영상")
     st.caption("간단한 YouTube API로 가져온 실시간 인기 동영상 목록")
 
@@ -89,7 +95,7 @@ def main() -> None:
         st.header("설정")
         region_code = st.text_input("지역 코드 (ISO 3166-1 alpha-2)", value=default_region, help="예: KR, US, JP 등")
         max_results = st.slider("가져올 개수", min_value=1, max_value=50, value=max(1, min(default_max, 50)))
-        refresh = st.button("🔄 새로고침", help="캐시를 비우고 다시 불러옵니다")
+        refresh = st.button("새로고침", help="캐시를 비우고 다시 불러옵니다")
 
     if refresh:
         # Clear all cached data for this session and rerun

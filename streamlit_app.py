@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional
 import requests
 import streamlit as st
 from dotenv import load_dotenv
+import bcrypt
 
 
 # Load environment variables from .env if present (for local development)
@@ -45,6 +46,58 @@ def get_config(key: str, default: Optional[str] = None) -> Optional[str]:
     if val is not None and val != "":
         return val
     return default
+
+
+# ---------------- Authentication helpers ----------------
+
+def _auth_config() -> Dict[str, Optional[str]]:
+    return {
+        "username": get_config("AUTH_USERNAME"),
+        "password_hash": get_config("AUTH_PASSWORD_HASH"),
+    }
+
+
+def _auth_enabled(cfg: Dict[str, Optional[str]]) -> bool:
+    return bool(cfg.get("username") and cfg.get("password_hash"))
+
+
+def _verify_password(plain: str, hashed: str) -> bool:
+    try:
+        return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
+    except Exception:
+        return False
+
+
+def require_login() -> bool:
+    """Return True if access is allowed (either no auth configured or user logged in)."""
+    cfg = _auth_config()
+    if not _auth_enabled(cfg):
+        return True  # No auth configured
+
+    if st.session_state.get("auth_ok"):
+        return True
+
+    st.session_state.setdefault("login_failed", False)
+    st.info("이 앱은 인증이 필요합니다. 로그인하세요.")
+
+    with st.form("login_form", clear_on_submit=False):
+        in_user = st.text_input("아이디", value="", autocomplete="username")
+        in_pass = st.text_input("비밀번호", value="", type="password", autocomplete="current-password")
+        submitted = st.form_submit_button("로그인")
+
+    if submitted:
+        if in_user == cfg["username"] and _verify_password(in_pass, cfg["password_hash"]):
+            st.session_state["auth_ok"] = True
+            st.session_state["auth_user"] = in_user
+            st.success("로그인 성공")
+            st.experimental_rerun()
+        else:
+            st.session_state["login_failed"] = True
+
+    if st.session_state.get("login_failed"):
+        st.error("아이디 또는 비밀번호가 올바르지 않습니다.")
+
+    return False
 
 
 @st.cache_data(show_spinner=True)
